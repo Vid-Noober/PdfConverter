@@ -1,35 +1,39 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 export default function Header() {
   const [dropdown, setDropdown] = useState(false);
+  const location = useLocation();
+
+  // This is the magic fix: close dropdown whenever the URL changes
+  useEffect(() => {
+    setDropdown(false);
+  }, [location]);
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto flex justify-between items-center p-4">
         {/* Logo */}
-        <div className="font-bold text-xl text-red-500">
-         BRO VID SINGLE
-        </div>
+        <Link to="/" className="font-bold text-xl text-red-500">
+          BRO VID SINGLE
+        </Link>
 
         {/* Menu */}
         <nav className="hidden md:flex gap-6 items-center">
-          <Link to="/merge" className="hover:text-red-500">Merge</Link>
-          <Link to="/split" className="hover:text-red-500">Split</Link>
-          <Link to="/compress" className="hover:text-red-500">Compress</Link>
 
           <div className="relative">
             <button
               onClick={() => setDropdown(!dropdown)}
-              className="hover:text-red-500"
+              className="hover:text-red-500 font-medium flex items-center gap-1"
             >
-              Convert PDF ▼
+              Convert PDF <span className="text-[10px]">{dropdown ? "▲" : "▼"}</span>
             </button>
+            
             {dropdown && (
-              <div className="absolute top-full left-0 bg-white shadow-md rounded-md mt-1 w-40">
+              <div className="absolute top-full left-0 bg-white shadow-xl border border-gray-100 rounded-lg mt-2 w-48 py-2 z-[60]">
                 <Link
                   to="/convert-pdf"
-                  className="block px-4 py-2 hover:bg-red-50"
+                  className="block px-4 py-2 hover:bg-red-50 hover:text-red-500"
                 >
                   Image to PDF
                 </Link>
@@ -38,11 +42,8 @@ export default function Header() {
           </div>
         </nav>
 
-       
-
-        {/* Mobile menu toggle */}
         <div className="md:hidden">
-          {/* Could add hamburger menu for mobile */}
+          <button className="text-2xl">☰</button>
         </div>
       </div>
     </header>
