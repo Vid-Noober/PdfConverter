@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import jsPDF from "jspdf";
 import UploadZone from "../Components/UploadZone";
 
@@ -7,151 +7,115 @@ export default function ConvertPDF() {
   const [orientation, setOrientation] = useState("portrait");
   const [pageSize, setPageSize] = useState("a4");
   const [margin, setMargin] = useState("none");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const hasFiles = files.length > 0;
+
+  // Helpers to handle file conversion
+  const readFile = (file) => new Promise((res) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result);
+    reader.readAsDataURL(file);
+  });
+
+  const loadImage = (src) => new Promise((res) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.src = src;
+  });
 
   const convertToPDF = async () => {
     if (!files.length) return;
+    setIsProcessing(true);
 
-    const pdf = new jsPDF({
-      orientation: orientation === "portrait" ? "p" : "l",
-      unit: "mm",
-      format: pageSize,
-    });
+    try {
+      const pdf = new jsPDF({
+        orientation: orientation === "portrait" ? "p" : "l",
+        unit: "mm",
+        format: pageSize,
+      });
 
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
+      for (let i = 0; i < files.length; i++) {
+        const imgData = await readFile(files[i]);
+        const img = await loadImage(imgData);
 
-    const marginSize =
-      margin === "big" ? 20 : margin === "small" ? 10 : 0;
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        
+        // marginSize is 0 for "none", 10mm for "small", 20mm for "big"
+        const marginSize = margin === "big" ? 20 : margin === "small" ? 10 : 0;
 
-    for (let i = 0; i < files.length; i++) {
-      const imgData = await readFile(files[i]);
-      const img = await loadImage(imgData);
+        // Calculate the draw area
+        const drawW = pageW - (marginSize * 2);
+        const drawH = pageH - (marginSize * 2);
 
-      const imgRatio = img.width / img.height;
-      const pageRatio = pageW / pageH;
+        // Center the image (if margin is 0, x and y will be 0)
+        const x = marginSize;
+        const y = marginSize;
 
-      let w, h;
-      if (imgRatio > pageRatio) {
-        w = pageW - marginSize * 2;
-        h = w / imgRatio;
-      } else {
-        h = pageH - marginSize * 2;
-        w = h * imgRatio;
+        if (i > 0) pdf.addPage();
+        
+        // Adding 'ALIAS' or 'FAST' helps with rendering large images
+        pdf.addImage(img, "JPEG", x, y, drawW, drawH, undefined, 'FAST');
       }
 
-      const x = (pageW - w) / 2;
-      const y = (pageH - h) / 2;
-
-      if (i > 0) pdf.addPage();
-      pdf.addImage(img, "JPEG", x, y, w, h);
+      pdf.save("converted_document.pdf");
+    } catch (err) {
+      console.error(err);
+      alert("Download failed. Please check the console.");
+    } finally {
+      setIsProcessing(false);
     }
-
-    pdf.save("image-to-pdf.pdf");
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="min-h-screen bg-[#f3f0eb] pb-20">
+      <div className={`mx-auto px-4 pt-10 transition-all duration-500 ${hasFiles ? "max-w-[1400px]" : "max-w-3xl text-center"}`}>
+        
+        {!hasFiles && (
+          <div className="mb-10">
+            <h1 className="text-5xl font-bold text-gray-800 mb-4">JPG to PDF</h1>
+            <p className="text-xl text-gray-600">Convert JPG images to PDF in seconds. Edge-to-edge support.</p>
+          </div>
+        )}
 
-        {/* UPLOAD */}
-        <div className="lg:col-span-2">
-          <UploadZone files={files} setFiles={setFiles} />
-        </div>
+        <div className={`grid grid-cols-1 ${hasFiles ? "lg:grid-cols-4" : "grid-cols-1"} gap-8`}>
+          <div className={`${hasFiles ? "lg:col-span-3" : "col-span-1"}`}>
+            <UploadZone files={files} setFiles={setFiles} />
+          </div>
 
-        {/* OPTIONS */}
-        <div className="bg-white border rounded-2xl p-6 shadow-sm
-                        space-y-6 lg:sticky lg:top-6 h-fit">
+          {hasFiles && (
+            <div className="bg-white border shadow-xl p-6 h-fit lg:sticky lg:top-6 rounded-2xl">
+              <h2 className="text-sm font-bold mb-6 text-gray-400 uppercase tracking-widest border-b pb-4">Settings</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-2">PAGE ORIENTATION</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => setOrientation("portrait")} className={`p-3 border-2 rounded-xl text-xs font-bold ${orientation === "portrait" ? "border-red-500 bg-red-50 text-red-600" : "border-gray-100 text-gray-400"}`}>PORTRAIT</button>
+                    <button onClick={() => setOrientation("landscape")} className={`p-3 border-2 rounded-xl text-xs font-bold ${orientation === "landscape" ? "border-red-500 bg-red-50 text-red-600" : "border-gray-100 text-gray-400"}`}>LANDSCAPE</button>
+                  </div>
+                </div>
 
-          <h2 className="text-xl font-semibold">Image to PDF options</h2>
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-2">MARGIN</p>
+                  <div className="flex bg-gray-100 p-1 rounded-xl">
+                    {["none", "small", "big"].map((m) => (
+                      <button key={m} onClick={() => setMargin(m)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition ${margin === m ? "bg-white shadow text-red-500" : "text-gray-400"}`}>
+                        {m.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-          {/* ORIENTATION */}
-          <div>
-            <p className="font-medium mb-2">Page orientation</p>
-            <div className="grid grid-cols-2 gap-3">
-              <OptionCard
-                label="Portrait"
-                active={orientation === "portrait"}
-                onClick={() => setOrientation("portrait")}
-              />
-              <OptionCard
-                label="Landscape"
-                active={orientation === "landscape"}
-                onClick={() => setOrientation("landscape")}
-              />
+                <button onClick={convertToPDF} disabled={isProcessing} className="w-full bg-[#E5322D] hover:bg-red-700 text-white py-4 rounded-xl text-xl font-bold shadow-lg flex items-center justify-center">
+                  {isProcessing ? "Generating..." : "Convert to PDF"}
+                </button>
+              </div>
             </div>
-          </div>
-
-          {/* PAGE SIZE */}
-          <div>
-            <p className="font-medium mb-2">Page size</p>
-            <select
-              value={pageSize}
-              onChange={(e) => setPageSize(e.target.value)}
-              className="w-full border rounded-xl px-4 py-3"
-            >
-              <option value="a4">A4 (297×210 mm)</option>
-              <option value="letter">Letter</option>
-            </select>
-          </div>
-
-          {/* MARGIN */}
-          <div>
-            <p className="font-medium mb-2">Margin</p>
-            <div className="grid grid-cols-3 gap-3">
-              {["none", "small", "big"].map((m) => (
-                <OptionCard
-                  key={m}
-                  label={m === "none" ? "No margin" : m}
-                  active={margin === m}
-                  onClick={() => setMargin(m)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* BUTTON */}
-          <button
-            onClick={convertToPDF}
-            className="bg-red-500 hover:bg-red-600 transition
-            text-white w-full py-4 rounded-2xl
-            text-lg font-semibold"
-          >
-            Convert to PDF →
-          </button>
+          )}
         </div>
       </div>
     </div>
   );
-}
-
-/* OptionCard */
-function OptionCard({ label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`border rounded-xl p-5 text-center transition font-medium
-      ${active
-        ? "border-red-500 text-red-500 bg-red-50"
-        : "border-gray-300 text-gray-500 hover:border-gray-400"}`}
-    >
-      {label}
-    </button>
-  );
-}
-
-/* Helpers */
-function readFile(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.readAsDataURL(file);
-  });
-}
-
-function loadImage(src) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.src = src;
-  });
 }
